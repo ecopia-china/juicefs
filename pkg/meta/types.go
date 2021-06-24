@@ -64,6 +64,7 @@ type DumpedAttr struct {
 	Nlink     uint32 `json:"nlink"`
 	Length    uint64 `json:"length"`
 	Rdev      uint32 `json:"rdev,omitempty"`
+	EcopiaUid uint64 `json:"ecopia_uid"`
 }
 
 type DumpedSlice struct {
@@ -201,6 +202,7 @@ func dumpAttr(a *Attr) *DumpedAttr {
 		Ctimensec: a.Ctimensec,
 		Nlink:     a.Nlink,
 		Rdev:      a.Rdev,
+		EcopiaUid: a.EcopiaUid,
 	}
 	if a.Typ == TypeFile {
 		d.Length = a.Length
@@ -223,6 +225,7 @@ func loadAttr(d *DumpedAttr) *Attr {
 		Ctimensec: d.Ctimensec,
 		Nlink:     d.Nlink,
 		Rdev:      d.Rdev,
+		EcopiaUid: d.EcopiaUid,
 		Full:      true,
 	} // Length and Parent not set
 }

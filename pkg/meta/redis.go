@@ -256,6 +256,7 @@ func (r *redisMeta) Init(format Format, force bool) error {
 	attr.Nlink = 2
 	attr.Length = 4 << 10
 	attr.Parent = 1
+	attr.EcopiaUid = 0
 	return r.rdb.Set(Background, r.inodeKey(1), r.marshal(&attr), 0).Err()
 }
 
@@ -521,12 +522,13 @@ func (r *redisMeta) parseAttr(buf []byte, attr *Attr) {
 	if rb.Left() >= 8 {
 		attr.Parent = Ino(rb.Get64())
 	}
+	attr.EcopiaUid = rb.Get64()
 	attr.Full = true
 	logger.Tracef("attr: %+v -> %+v", buf, attr)
 }
 
 func (r *redisMeta) marshal(attr *Attr) []byte {
-	w := utils.NewBuffer(36 + 24 + 4 + 8)
+	w := utils.NewBuffer(36 + 24 + 4 + 8 + 8)
 	w.Put8(attr.Flags)
 	w.Put16((uint16(attr.Typ) << 12) | (attr.Mode & 0xfff))
 	w.Put32(attr.Uid)
@@ -541,6 +543,7 @@ func (r *redisMeta) marshal(attr *Attr) []byte {
 	w.Put64(attr.Length)
 	w.Put32(attr.Rdev)
 	w.Put64(uint64(attr.Parent))
+	w.Put64(attr.EcopiaUid)
 	logger.Tracef("attr: %+v -> %+v", attr, w.Bytes())
 	return w.Bytes()
 }
@@ -1251,6 +1254,13 @@ func (r *redisMeta) mknod(ctx Context, parent Ino, name string, _type uint8, mod
 		attr.Ctimensec = uint32(now.Nanosecond())
 		if ctx.Value(CtxKey("behavior")) == "Hadoop" {
 			attr.Gid = pattr.Gid
+		}
+		if _type == TypeDirectory && parent == 1 {
+			if attr.EcopiaUid, err = strconv.ParseUint(name, 10, 64); err != nil {
+				logger.Errorf("Parse platform user uid failed: %s", name)
+			}
+		} else {
+			attr.EcopiaUid = pattr.EcopiaUid
 		}
 
 		_, err = tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
@@ -2036,10 +2046,37 @@ func (r *redisMeta) Read(ctx Context, inode Ino, indx uint32, chunks *[]Slice) s
 	return 0
 }
 
+func (r *redisMeta) setChunkOwner(ctx Context, chunkid uint64, inode Ino) {
+	var attr Attr
+	a, err := r.rdb.Get(ctx, r.inodeKey(inode)).Bytes()
+	if err != nil {
+		logger.Errorf("Get inode failed: %v", err)
+		return
+	}
+	r.parseAttr(a, &attr)
+	if _, err = r.rdb.HSet(ctx, "chunkowner",
+		strconv.FormatUint(chunkid, 10), strconv.FormatUint(attr.EcopiaUid, 10)).Result(); err != nil {
+		logger.Errorf("HSet chunkid owner failed: %v", err)
+		return
+	}
+	return
+}
+
+func (r *redisMeta) GetChunkOwner(chunkid uint64) string {
+	var ctx = Background
+	v, err := r.rdb.HGet(ctx, "chunkowner", strconv.FormatUint(chunkid, 10)).Uint64()
+	if err != nil {
+		logger.Errorf("HGet chunkid owner failed: %v", err)
+		return ""
+	}
+	return strconv.FormatUint(v, 10)
+}
+
 func (r *redisMeta) NewChunk(ctx Context, inode Ino, indx uint32, offset uint32, chunkid *uint64) syscall.Errno {
 	cid, err := r.rdb.Incr(ctx, "nextchunk").Uint64()
 	if err == nil {
 		*chunkid = cid
+		r.setChunkOwner(ctx, cid, inode)
 	}
 	return errno(err)
 }
@@ -2498,6 +2535,7 @@ func (r *redisMeta) compactChunk(inode Ino, indx uint32, force bool) {
 	if err != nil {
 		return
 	}
+	r.setChunkOwner(ctx, chunkid, inode)
 
 	var ss []*slice
 	var chunks []Slice

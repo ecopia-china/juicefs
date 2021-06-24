@@ -428,8 +428,8 @@ func Serve(conf *vfs.Config, options string, attrCacheTo, entryCacheTo, dirEntry
 	imp.direntryTimeout = time.Millisecond * time.Duration(dirEntryCacheTo*1000)
 
 	var opt fuse.MountOptions
-	opt.FsName = "JuiceFS:" + conf.Format.Name
-	opt.Name = "juicefs"
+	opt.FsName = conf.Format.Name
+	opt.Name = conf.Format.Name
 	opt.SingleThreaded = false
 	opt.MaxBackground = 50
 	opt.EnableLocks = true

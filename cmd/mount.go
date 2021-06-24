@@ -142,6 +142,7 @@ func mount(c *cli.Context) error {
 		logger.Fatalf("object storage: %s", err)
 	}
 	logger.Infof("Data use %s", blob)
+	blob = object.WithOwnerPrefix(blob, m)
 	blob = object.WithMetrics(blob)
 	store := chunk.NewCachedStore(blob, chunkConf)
 	m.OnMsg(meta.DeleteChunk, meta.MsgCallback(func(args ...interface{}) error {

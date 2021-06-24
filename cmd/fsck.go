@@ -33,6 +33,13 @@ func checkFlags() *cli.Command {
 		Usage:     "Check consistency of file system",
 		ArgsUsage: "META-URL",
 		Action:    fsck,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "custom-prefix",
+				Value: "",
+				Usage: "object storage custom prefix",
+			},
+		},
 	}
 }
 
@@ -67,6 +74,9 @@ func fsck(ctx *cli.Context) error {
 	logger.Infof("Data use %s", blob)
 
 	logger.Infof("Listing all blocks ...")
+	if customPrefix := ctx.String("custom-prefix"); customPrefix != "" {
+		blob = object.WithPrefix(blob, customPrefix)
+	}
 	blob = object.WithPrefix(blob, "chunks/")
 	objs, err := osync.ListAll(blob, "", "")
 	if err != nil {

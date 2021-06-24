@@ -1768,6 +1768,10 @@ func (m *dbMeta) Read(ctx Context, inode Ino, indx uint32, chunks *[]Slice) sysc
 	return 0
 }
 
+func (m *dbMeta) GetChunkOwner(chunkid uint64) string {
+	return ""
+}
+
 func (m *dbMeta) NewChunk(ctx Context, inode Ino, indx uint32, offset uint32, chunkid *uint64) syscall.Errno {
 	m.freeMu.Lock()
 	defer m.freeMu.Unlock()

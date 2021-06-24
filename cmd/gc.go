@@ -52,6 +52,11 @@ func gcFlags() *cli.Command {
 				Value: 10,
 				Usage: "number threads to delete leaked objects",
 			},
+			&cli.StringFlag{
+				Name:  "custom-prefix",
+				Value: "",
+				Usage: "object storage custom prefix",
+			},
 		},
 	}
 }
@@ -164,6 +169,9 @@ func gc(ctx *cli.Context) error {
 		}
 	}
 
+	if customPrefix := ctx.String("custom-prefix"); customPrefix != "" {
+		blob = object.WithPrefix(blob, customPrefix)
+	}
 	blob = object.WithPrefix(blob, "chunks/")
 	objs, err := osync.ListAll(blob, "", "")
 	if err != nil {

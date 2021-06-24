@@ -86,6 +86,8 @@ type Attr struct {
 	Parent    Ino  // inode of parent, only for Directory
 	Full      bool // the attributes are completed or not
 	KeepCache bool // whether to keep the cached page or not
+
+	EcopiaUid uint64 // ecopia platform user id
 }
 
 func typeToStatType(_type uint8) uint32 {
@@ -306,6 +308,7 @@ type Meta interface {
 
 	DumpMeta(w io.Writer) error
 	LoadMeta(r io.Reader) error
+	GetChunkOwner(chunkid uint64) string
 }
 
 func removePassword(uri string) string {
